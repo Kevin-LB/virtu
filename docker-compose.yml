@@ -1,0 +1,84 @@
+version: '3.7'
+
+services:
+  traefik:
+    image: traefik:v2.5
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - web
+
+  reprise_contact:
+    build: 
+      context: ./services/php
+      dockerfile: Dockerfile
+    image: reprise_contact:latest
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.reprise_contact.rule=Host(`utilisateurs.localhost`)"
+      - "traefik.http.services.reprise_contact.loadbalancer.server.port=80"
+
+  cluster:
+    build: 
+      context: ./services/cluster
+      dockerfile: Dockerfile
+    deploy:
+      replicas: 5
+    image: cluster:latest
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cluster.rule=Host(`clusterswarm.localhost`)"
+      - "traefik.http.services.cluster.loadbalancer.server.port=80"
+
+  fortune:
+    build: 
+      context: ./services/app_fortune_image
+      dockerfile: Dockerfile
+    image: fortune:latest
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.fortune.rule=Host(`fortune.localhost`)"
+      - "traefik.http.services.fortune.loadbalancer.server.port=80"
+
+  flask:
+    build: 
+      context: ./services/flask
+      dockerfile: Dockerfile
+    image: flask:latest
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.flask.rule=Host(`flask.localhost`)"
+      - "traefik.http.services.flask.loadbalancer.server.port=80"
+
+  mysql:
+    image: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+    networks:
+      - web
+
+  redis:
+    image: redis
+    deploy:
+      replicas: 2
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
